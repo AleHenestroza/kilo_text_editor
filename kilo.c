@@ -59,11 +59,41 @@ char editorReadKey() {
     return c;
 }
 
+int getCursorPosition(int *rows, int *cols) {
+    char buf[32];
+    unsigned int i = 0;
+
+    // The n command (Device Status Report) can be used to query terminal status information.
+    if (write(STDOUT_FILENO, "\x1b[6n", 4) != 4) return -1;
+
+    // Read the reply of the n command
+    // The output follows the format <escape><cols>;<rows>R (i.e: \[24;80R), so we want to stop
+    // at 'R' and append a 0 byte so that we can then read the buffer up until that point.
+    while (i < sizeof(buf) - 1) {
+        if (read(STDIN_FILENO, &buf[i], 1) != 1) break;
+        if (buf[i] == 'R') break;
+        i++;
+    }
+    buf[i] = '\0';
+
+    if (buf[0] != '\x1b' || buf[1] != '[') return -1;
+    if (sscanf(&buf[2], "%d;%d", rows, cols) != 2) return -1; // Parse rows and cols to the global struct.
+
+    return 0;
+}
+ 
 int getWindowSize(int *rows, int *cols) {
     struct winsize ws;
 
     if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == -1 || ws.ws_col == 0) {
-        return -1;
+        // On some systems, ioctl fails to read the window's size, therefore we use the following
+        // hack for reading the size. We position the cursor at the bottom-right and then use escape
+        // sequences that allow us to query the position of the cursor.
+        // We use the command C (Cursor Forward) and B (Cursor Down) with a big number (999) to ensure
+        // the cursor reaches the end of the row and column. Both will stop the cursor going past the
+        // edge of the screen.
+        if (write(STDOUT_FILENO, "\x1b[999C\x1b[999B", 12) != 12) return -1;
+        return getCursorPosition(rows, cols);
     } else {
         *cols = ws.ws_col;
         *rows = ws.ws_row;

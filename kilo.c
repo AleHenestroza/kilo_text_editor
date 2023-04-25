@@ -59,7 +59,32 @@ char editorReadKey() {
     while ((nread = read(STDIN_FILENO, &c, 1)) != 1) {
         if (nread == -1 && errno != EAGAIN) die("read");
     }
-    return c;
+
+    // If we read an escape character, we read the following two characters.
+    // If read() times out, we assume the user pressed "Escape", otherwise
+    // we check if the pressed key is an arrow escape sequence.
+    if (c == '\x1b') {
+        char seq[3]; // Set to 3 to handle longer escape sequences in the future.
+
+        if (read(STDIN_FILENO, &seq[0], 1) != 1) return '\x1b';
+        if (read(STDIN_FILENO, &seq[1], 1) != 1) return '\x1b';
+
+        if (seq[0] == '[') {
+            // We are aliasing the arrow keys to WASD, leaving the WASD keys still mapped
+            // to the editorMoveCursor() function.
+            switch (seq[1]) {
+                case 'A': return 'w';
+                case 'B': return 's';
+                case 'C': return 'd';
+                case 'D': return 'a';
+            }
+        }
+
+        // If the input is not an arrow escape sequence, we return an escape character.
+        return '\x1b';
+    } else {
+        return c;
+    }
 }
 
 int getCursorPosition(int *rows, int *cols) {

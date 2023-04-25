@@ -135,12 +135,22 @@ void editorDrawRows(struct abuf *ab) {
             int welcomelen = snprintf(welcome, sizeof(welcome),
                 "Kilo editor -- version %s", KILO_VERSION);
             if (welcomelen > E.screencols) welcomelen = E.screencols;
+
+            // Divide screensize by 2 and substract half of the string's length to get padding size
+            int padding = (E.screencols - welcomelen) / 2;
+            // First character should be a ~
+            if (padding) {
+                abAppend(ab, "~", 1);
+                padding--;
+            }
+            while (padding--) abAppend(ab, " ", 1);
+
             abAppend(ab, welcome, welcomelen);
+        } else {
+            abAppend(ab, "~", 1);
         }
 
-        abAppend(ab, "~", 1);
         abAppend(ab, "\x1b[K", 3);
-        
         if (y < E.screenrows - 1) {
             abAppend(ab, "\r\n", 2);
         }
